@@ -16,6 +16,8 @@ Needed files:
 as `YOUR_STEAMID.json`
 * `prices.csv` (`appid, price` - price you paid for each game)
 * `packages.csv` (`appid, subid` - Steam package where each app is located)
+* `licenses.txt` if you want to run `licenses.py` (it's the output from
+`licenses_print` on Steam console - doesn't actually do anything yet)
 
 Usage:
 * `python steam.py --plot` draws a bubble chart where all the named bubbles are
@@ -25,4 +27,4 @@ time played. Coloring goes from red (worst) to blue (best).
 under `./temp`
 * `python spreadsheet.py` updates your spreadsheet
 
-<sub><sup><sub><sup>Don't worry, it only gets better.</sup></sub></sup></sub>
+<sub><sup><sub><sup>I guess I lied.</sup></sub></sup></sub>
