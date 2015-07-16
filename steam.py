@@ -4,9 +4,10 @@ import csv
 import datetime
 import glob
 import json
-import math
+import os
 import re
 import requests
+import subprocess
 import sys
 
 import matplotlib.pyplot as plt
@@ -14,82 +15,44 @@ import matplotlib.pyplot as plt
 private_data = json.load(open('config.json'))
 api_key = private_data['api_key']
 steamid = private_data['steamid']
+steam_login = private_data['steam_login']
 
-if "--update" in sys.argv:
-    before = datetime.datetime.now()
-    url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/" + \
-        "?key="+api_key+"&steamid=" + steamid + \
-        "&include_appinfo=1&include_played_free_games=1"
-
-    my_games = requests.get(url).json()['response']
-    game_count = my_games['game_count']
-
-    with open(steamid + ".json", 'w') as file:
-        json.dump(my_games['games'], file)
-
-    for game, count in zip(my_games['games'], range(game_count)):
-        with open('temp/' + str(game['appid']) + ".in", 'w') as file:
-            print("[{:2.1%}] Writing to local storage"
-                  .format(float(count / game_count)), end="\r")
-            json.dump(requests.get("http://store.steampowered.com/api/" +
-                      "appdetails/?appids=" + str(game['appid'])).json(), file)
-
-    print("Time spent on storing files: %s" %
-          str(datetime.datetime.now() - before))
+with open('prices.csv') as file:
+    prices = dict(filter(None, csv.reader(file)))
 
 with open(steamid + ".json", 'r') as file:
     my_games = json.load(file)
 
 
-def list_games():
-    def numericalSort(value):
-        parts = re.compile(r'(\d+)').split(value)
-        parts[1::2] = map(int, parts[1::2])
-        return parts
+def exclude_free_games(games):
+    cont = 1
+    for game in games:
+        if appid(game) not in list(prices.keys()):
+            cont += 1
 
-    store_info = []
-    for file in sorted(glob.glob("temp/*.in"), key=numericalSort):
-        with open(file) as game:
-            store_info.append(json.loads(game.read()))
-    return store_info
-
-with open('prices.csv') as file:
-    prices = dict(filter(None, csv.reader(file)))
-
-with open('packages.csv') as file:
-    packages = dict(filter(None, csv.reader(file)))
+    freeless = games[:len(games) - cont] + [games[-1]]
+    return sorted(freeless, key=lambda k: k['appid'])
 
 
 def icon(game):
-    for any_game in my_games:
-        if appid(game) == any_game['appid']:
-            url = any_game['img_icon_url']
-            return "http://media.steampowered.com/steamcommunity/public/" + \
-                   "images/apps/"+str(appid(game))+"/"+url+".jpg"
+    return "http://media.steampowered.com/steamcommunity/public/" + \
+            "images/apps/"+appid(game)+"/"+game['img_icon_url']+".jpg"
 
 
 def appid(game):
-    return int(list(game.keys())[0])
+    return str(game['appid'])
 
 
-def subid(game):
-    return int(packages[str(appid(game))])
-
-
-def name(appid):
-    for game in my_games:
-        if appid == game['appid']:
-            return game['name']
+def name(game):
+    return game['name']
 
 
 def price(game):
-    return float(prices[list(game.keys())[0]])
+    return float(prices[appid(game)])
 
 
 def time(game):
-    for any_game in my_games:
-        if appid(game) == any_game['appid']:
-            return float("{0:.2f}".format(any_game['playtime_forever'] / 60))
+    return float("{0:.2f}".format(game['playtime_forever'] / 60))
 
 
 def pph(game):
@@ -101,11 +64,28 @@ def pph(game):
     return price(game) / spent
 
 
+def read_games():
+    def numericalSort(value):
+        parts = re.compile(r'(\d+)').split(value)
+        parts[1::2] = map(int, parts[1::2])
+        return parts
+
+    store_info = []
+    for file in sorted(glob.glob("temp/*.in"), key=numericalSort):
+        with open(file) as game:
+            store_info.append(json.loads(game.read()))
+    return store_info
+
+
 def discount(game):
-    game = game[list(game.keys())[0]]
+    app = appid(game)
+    for any_game in read_games():
+        if app in list(any_game.keys()):
+            game = any_game[list(any_game.keys())[0]]
+
     if game['success'] and "price_overview" in list(game['data'].keys()):
-        return math.fabs(float(prices[str(game['data']['steam_appid'])]) /
-                         (game['data']['price_overview']['initial']/100) - 1)
+        return abs(float(prices[str(game['data']['steam_appid'])]) /
+                   (game['data']['price_overview']['initial']/100) - 1)
     return 0
 
 
@@ -125,14 +105,47 @@ def achiev(game):
     else:
         return ""
 
+
+if "--update" in sys.argv:
+    bashcmd = "steamcmd +login " + steam_login + \
+              " +licenses_print +quit > licenses.txt"
+    process = subprocess.Popen(bashcmd, shell=True, stdout=subprocess.PIPE)
+
+    before = datetime.datetime.now()
+    url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/" + \
+        "?key="+api_key+"&steamid=" + steamid + \
+        "&include_appinfo=1&include_played_free_games=1"
+
+    response = requests.get(url).json()['response']
+    game_count = response['game_count']
+    freeless = exclude_free_games(response['games'])
+
+    with open(steamid + ".json", 'w') as file:
+        json.dump(freeless, file)
+
+    for game, count in zip(freeless, range(game_count)):
+        n = str(game['appid']) + ".in"
+        os.makedirs("temp", exist_ok=True)
+
+        with open("temp/" + n, 'w') as file:
+            print("[{:2.1%}] ".format(count / game_count) + "Writing " + n,
+                  end="\r")
+            json.dump(requests.get("http://store.steampowered.com/api/" +
+                                   "appdetails/?appids=" +
+                                   str(game['appid'])).json(), file)
+
+    print("Time spent on storing files: %s" %
+          str(datetime.datetime.now() - before))
+
 if "--plot" in sys.argv:
     hours_played, price_paid, price_per_hour, game_name = [], [], [], []
+    games = exclude_free_games(my_games)
 
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    for game in list_games():
-        its_name = name(appid(game))
+    for game in games:
+        its_name = name(game)
         its_time = time(game)
         its_price = price(game)
         its_cost = pph(game)
