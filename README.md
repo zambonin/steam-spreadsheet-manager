@@ -16,6 +16,6 @@ Needed files:
 * `prices.csv` (`appid, price` - price you paid for each game)
 
 Usage:
-* `python steam.py --update` pulls Steam store data for each game and stores it
+* `python updater.py` pulls Steam store data for each game and stores it
 under `./temp`
-* `python spreadsheet.py` updates your spreadsheet
+* `python manager.py` updates your spreadsheet
