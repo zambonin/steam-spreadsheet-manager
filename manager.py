@@ -98,22 +98,14 @@ worksheet.resize(len(games) + (index - 1))
 
 for game, i in zip(games, range(index, len(games) + index)):
     cell_list = worksheet.range('A%s:L%s' % (i, i))
-    print("Updating row #%s, time elapsed: %s" %
-          (str(i), str(datetime.now() - before)), end='\r')
-    values_list = [
-                    show_icon(game),
-                    app_link(game),
-                    game['name'],
-                    price(game),
-                    time(game),
-                    pph(game),
-                    achiev(game),
-                    discount(game),
-                    sub_link(game),
-                    game['date'],
-                    game['location'],
-                    game['license']
-                ]
+    percentage = (i - index) / (len(games))
+    print("[{:2.1%}] ".format(percentage)+"Updating row #%s" % str(i),
+          end="\r")
+    values_list = [show_icon(game), app_link(game), game['name'], price(game),
+                   time(game), pph(game), achiev(game), discount(game),
+                   sub_link(game), game['date'], game['location'],
+                   game['license']]
+
     for cell, value in zip(cell_list, values_list):
         cell.value = value
     worksheet.update_cells(cell_list)
