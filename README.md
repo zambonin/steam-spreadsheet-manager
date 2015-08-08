@@ -15,7 +15,4 @@ Needed files:
   - `json_keyfile_path` is your `oauth-...-.json` file path
 * `prices.csv` (`appid, price` - price you paid for each game)
 
-Usage:
-* `python updater.py` pulls Steam store data for each game and stores it
-under `./temp`
-* `python manager.py` updates your spreadsheet
+Usage: `python manager.py`
