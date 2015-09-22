@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 
-import gspread
+import csv
 import datetime
+import gspread
 import json
 import locale
 import re
@@ -23,9 +24,10 @@ def merge_dict_lists(list1, list2, key):
 
 def show_icon(game):
     if "img_icon_url" in game.keys():
-        return "=IMAGE(\"http://media.steampowered.com/steamcommunity/\
-                    public/images/apps/" + str(game['appid']) + "/" + \
-                    game['img_icon_url'] + ".jpg" + "\"; 1)"
+        return "=IMAGE(\"http://media.steampowered.com/steamcommunity/" + \
+            "public/images/apps/%d/%s.jpg\"; 1)" % (game['appid'],
+                                                    game['img_icon_url'])
+
     return ""
 
 
@@ -97,11 +99,11 @@ def read_steam_data():
 def read_price_data(path):
     prices = []
     with open(path) as f:
-        for line in f.readlines()[1:]:
-            content = line.strip('\n').split(',')
+        content = csv.reader(f)
+        for line in content:
             prices.append({
-                'appid': int(content[0]),
-                'price_paid': float(content[1]),
+                'appid': int(line[0]),
+                'price_paid': float(line[1]),
             })
 
     return prices
@@ -155,12 +157,14 @@ gc = gspread.authorize(credentials)
 prices = read_price_data('prices.csv')
 game_data = read_steam_data()
 game_list = exclude_free_games(sorted(merge_dict_lists(
-    prices, game_data, 'appid'), key=lambda k: k['appid']))
+    game_data, prices, 'appid'), key=lambda k: k['appid']))
 license_data = read_license_data()
 
+locale.setlocale(locale.LC_ALL, '')
 worksheet = gc.open_by_key(private_data['spreadsheet_key']).sheet1
 index = 2
 worksheet.resize(len(game_list) + (index - 1))
+values_list = []
 
 for game, i in zip(game_list, range(index, len(game_list) + index)):
     game = license_info(game)
@@ -176,17 +180,18 @@ for game, i in zip(game_list, range(index, len(game_list) + index)):
     if data['success'] and "name" not in game.keys():
         game['name'] = data['data']['name']
 
-    locale.setlocale(locale.LC_ALL, '')
-    cell_list = worksheet.range('A%s:L%s' % (i, i))
-    values_list = [show_icon(game), game['appid'], game['name'],
-                   price_paid(game), time_played(game), price_per_hour(game),
-                   achiev_info(game), discount_info(game), game['package'],
-                   game['date'], game['location'], game['license']]
+    values_list += [show_icon(game), game['appid'], game['name'],
+                    price_paid(game), time_played(game), price_per_hour(game),
+                    achiev_info(game), discount_info(game), game['package'],
+                    game['date'], game['location'], game['license']]
 
     percentage = (i - index + 1) / len(game_list)
-    print("[{:2.1%}] ".format(percentage) +
-          "Row #%s updated (%s)" % (str(i), game['name']))
+    print("[{:2.1%}] ".format((i - index + 1) / len(game_list)) +
+          "Row #%d" % i, end='\r')
 
-    for cell, value in zip(cell_list, values_list):
-        cell.value = value
-    worksheet.update_cells(cell_list)
+print("Uploading to Google Drive...")
+cell_list = worksheet.range('A%d:L%d' % (index, len(game_list) + (index - 1)))
+
+for cell, value in zip(cell_list, values_list):
+    cell.value = value
+worksheet.update_cells(cell_list)
