@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 
-import csv
-import gspread
 import json
-import locale
-import re
-import requests
-import subprocess
 
+from csv import reader as creader
 from datetime import datetime
+from gspread import authorize as login
+from multiprocessing.dummy import Pool as ThreadPool
 from oauth2client.service_account import ServiceAccountCredentials
+from re import findall
+from requests import get as rget
+from subprocess import Popen, PIPE
+from urllib.parse import urlencode
 
 
 def prep_game_list():
@@ -24,40 +25,65 @@ def prep_game_list():
 
     def read_steam_data():
         url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
-        return requests.get(url, params={
-                            "key": api_key,
-                            "steamid": steamid,
-                            "include_played_free_games": 1,
-                            "include_appinfo": 1,
-                            }).json()['response']['games']
+        master = rget(url, params={
+                      "key": api_key,
+                      "steamid": steamid,
+                      "include_played_free_games": 1,
+                      "include_appinfo": 1,
+                      }).json()['response']['games']
+
+        base_url = ("http://api.steampowered.com/ISteamUserStats/"
+                    "GetPlayerAchievements/v0001/?{}")
+        urls = [base_url.format(urlencode({
+                                "appid": game,
+                                "key": api_key,
+                                "steamid": steamid,
+                                })) for game in [i['appid'] for i in master]]
+
+        pool = ThreadPool(len(urls))
+
+        results = pool.map(rget, urls)
+        pool.close()
+        pool.join()
+
+        achiev_data = [i for i in [j.json()['playerstats'] for j in results]
+                       if i['success'] and 'achievements' in i.keys()]
+
+        final_dict = [{'name': i['gameName'],
+                       'achiev': len([a for a in i['achievements']
+                                     if a['achieved']])/len(i['achievements'])
+                       } for i in achiev_data]
+
+        return merge_dict_lists(master, final_dict, 'name')
 
     def read_price_data(path):
-        with open(path) as f:
-            content = csv.reader(f)
-            return [{'name': line[1],
-                     'appid': int(line[0]),
-                     'price_paid': float(line[3]),
-                     'orig_price': float(line[2])
-                     } for line in content]
+        return [{'name': line[1],
+                 'appid': int(line[0]),
+                 'price_paid': float(line[3]),
+                 'orig_price': float(line[2])
+                 } for line in creader(open(path))]
 
     def read_license_data():
         cmd = "steamcmd +login {} +licenses_print +quit".format(
             steam_login).split()
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+        proc = Popen(cmd, stdout=PIPE)
         content = [i.decode() for i in proc.stdout]
         index = [i for i, line in enumerate(content) if "License" in line][1:]
 
-        return [{'package': int(re.findall(r'(\d+)', content[i])[0]),
-                 'date': datetime.strptime(re.findall(
+        return [{'package': int(findall(r'(\d+)', content[i])[0]),
+                 'date': datetime.strptime(findall(
                      r'.* : (.+?) in .*', content[i+1])[0],
                      '%a %b %d %H:%M:%S %Y'),
-                 'location': re.findall(r'"(.*?)"', content[i+1])[0],
-                 'license': re.findall(r'.*\, (.*)', content[i+1])[0],
-                 'apps': re.findall(r'(\d+)', content[i+2])[:-1]}
+                 'location': findall(r'"(.*?)"', content[i+1])[0],
+                 'license': findall(r'.*\, (.*)', content[i+1])[0],
+                 'apps': findall(r'(\d+)', content[i+2])[:-1]}
                 for i in index]
 
+    print("Reading games data...", end='\r')
     steam_data = read_steam_data()
+    print("Reading price data...", end='\r')
     price_data = read_price_data('prices.csv')
+    print("Reading license data...", end='\r')
     license_data = read_license_data()
 
     priced_games = merge_dict_lists(steam_data, price_data, 'appid')
@@ -70,6 +96,8 @@ def prep_game_list():
                 g['location'] = l['location']
                 g['license'] = l['license']
                 break
+        if 'achiev' not in g.keys():
+            g['achiev'] = ""
 
     return sorted(priced_games, key=lambda k: k['appid'])
 
@@ -84,44 +112,28 @@ def show_icon(game):
 
 
 def price_paid(game):
-    return locale.str(game['price_paid'])
+    return game['price_paid']
 
 
 def time_played(game):
     if "playtime_forever" in game.keys():
-        return locale.str(game['playtime_forever'] / 60)
+        return game['playtime_forever'] / 60
     return "0"
 
 
 def price_per_hour(game):
-    spent = locale.atof(time_played(game))
+    spent = time_played(game)
     if not spent:
         return 0
-    if spent < 1:
-        return locale.str(spent)
-    return locale.str(locale.atof(price_paid(game)) / spent)
+    if float(spent) < 1:
+        return spent
+    return price_paid(game) / spent
 
 
 def discount_info(game):
     if not game['orig_price']:
         return 0
-    return locale.str(1 - (game['price_paid'] / game['orig_price']))
-
-
-def achiev_info(game):
-    url = ("http://api.steampowered.com/ISteamUserStats/"
-           "GetPlayerAchievements/v0001/")
-    data = requests.get(url, params={
-                        "appid": str(game['appid']),
-                        "key": api_key,
-                        "steamid": steamid,
-                        }).json()['playerstats']
-
-    if data['success'] and 'achievements' in data.keys():
-        cont = len([i for i in data['achievements'] if i['achieved']])
-        game['achiev'] = cont / len(data['achievements'])
-        return locale.str(game['achiev'])
-    return ""
+    return 1 - (game['price_paid'] / game['orig_price'])
 
 
 private_data = json.load(open('config.json'))
@@ -133,27 +145,23 @@ scope = ['https://spreadsheets.google.com/feeds']
 credentials = ServiceAccountCredentials.from_json_keyfile_name(
     private_data['json_keyfile_path'], scope)
 
-gc = gspread.authorize(credentials)
-
+gc = login(credentials)
 game_list = prep_game_list()
 
-locale.setlocale(locale.LC_ALL, '')
 worksheet = gc.open_by_key(private_data['spreadsheet_key']).sheet1
 index, length = 2, len(game_list)
 worksheet.resize(length + (index - 1))
 values_list = []
 
-for game, i in zip(game_list, range(index, length + index)):
+for game in game_list:
     values_list += [show_icon(game), game['appid'], game['name'],
                     price_paid(game), time_played(game), price_per_hour(game),
-                    achiev_info(game), discount_info(game), game['package'],
-                    game['date'], game['location'], game['license']]
+                    game['achiev'], discount_info(game),
+                    game['package'], game['date'], game['location'],
+                    game['license']]
 
-    percentage = (i - index + 1) / length
-    print("[{:2.1%}] Row #{} ({})".format(percentage, i, game['name']))
-
-print("Uploading to Google Drive...")
-cell_list = worksheet.range('A{}:L{}'.format(index, length + index - 1))
+print("Uploading to Google Drive...", end='\r')
+cell_list = worksheet.range('A{}:L{}'.format(index, length + (index - 1)))
 
 for cell, value in zip(cell_list, values_list):
     cell.value = value
