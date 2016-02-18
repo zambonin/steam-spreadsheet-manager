@@ -13,7 +13,7 @@ Needed files:
   - `steamid` is your Steam64 ID
   - `steam_login` is your Steam login name (not the public one!)
   - `json_keyfile_path` is your `oauth-...-.json` file path
-* `prices.csv` (`appid, name, orig, paid`)
+* `prices.json` (`appid, name, orig, paid`)
   - `appid` - game's appid
   - `name` - game's name
   - `orig` - game's store price
