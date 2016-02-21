@@ -1,18 +1,16 @@
 #!/usr/bin/env python
 
-import json
-
 from datetime import datetime
 from gspread import authorize
-from multiprocessing.dummy import Pool as ThreadPool
+from json import load
+from multiprocessing.dummy import Pool
 from oauth2client.service_account import ServiceAccountCredentials
 from re import findall
 from requests import get as rget
 from subprocess import Popen, PIPE
-from urllib.parse import urlencode
 
 
-def prep_game_list():
+def prep_game_list(api_key, steamid, login):
     def merge_dict_lists(list1, list2, key):
         merged = {}
         for item in list1 + list2:
@@ -23,45 +21,22 @@ def prep_game_list():
         return [value for (_, value) in merged.items()]
 
     def show_icon(game):
-        if "img_icon_url" in game.keys():
-            return ("=IMAGE(\"http://media.steampowered.com/"
-                    "steamcommunity/public/images/"
-                    "apps/{}/{}.jpg\"; 1)").format(game['appid'],
-                                                   game['img_icon_url'])
-        return ""
-
-    def time_played(game):
-        if "playtime_forever" in game.keys():
-            return game['playtime_forever'] / 60
-        return "0"
+        return ("=IMAGE(\"http://media.steampowered.com/steamcommunity/"
+                "public/images/apps/{}/{}.jpg\"; 1)"
+                ).format(game['appid'], game['img_icon_url'])
 
     def price_per_hour(game):
-        spent = time_played(game)
-        if not spent:
-            return 0
-        if float(spent) < 1:
-            return spent
-        return game['paid'] / spent
+        return (game['paid'] / game['time']) if game['time'] else 0
 
     def discount_info(game):
-        if not game['orig']:
-            return 0
-        return 1 - (game['paid'] / game['orig'])
+        return (1 - (game['paid'] / game['orig'])) if game['orig'] else 0
 
-    def read_steam_data():
-        url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
-        master = rget(url, params={"key": api_key, "steamid": steamid,
-                      "include_played_free_games": 1, "include_appinfo": 1}
-                      ).json()['response']['games']
-        appids = [i['appid'] for i in master]
-
+    def read_achiev_data(appids):
         urls = [("http://api.steampowered.com/ISteamUserStats/"
-                "GetPlayerAchievements/v0001/?{}").format(urlencode({
-                    "key": api_key,  "steamid": steamid,
-                    "appid": game})) for game in appids]
+                 "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}"
+                 ).format(api_key, steamid, game) for game in appids]
 
-        pool = ThreadPool(len(urls))
-
+        pool = Pool(len(urls))
         results = pool.map(rget, urls)
         pool.close()
         pool.join()
@@ -69,16 +44,26 @@ def prep_game_list():
         achiev_data = [i for i in [j.json()['playerstats'] for j in results]
                        if i['success'] and 'achievements' in i.keys()]
 
-        final_dict = [{'name': i['gameName'],
-                       'achiev': len([a for a in i['achievements']
-                                     if a['achieved']])/len(i['achievements'])
-                       } for i in achiev_data]
+        return [{'name': i['gameName'],
+                 'achv': sum([a['achieved'] for a in
+                             i['achievements']]) / len(i['achievements'])
+                 } for i in achiev_data]
 
-        return merge_dict_lists(master, final_dict, 'name')
+    def read_steam_data():
+        url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
+        master = rget(url, params={"key": api_key, "steamid": steamid,
+                      "include_played_free_games": 1, "include_appinfo": 1}
+                      ).json()['response']['games']
+
+        for i in master:
+            i['time'] = i.pop('playtime_forever') / 60
+            i['achv'] = ""
+
+        return merge_dict_lists(
+            master, read_achiev_data([i['appid'] for i in master]), 'name')
 
     def read_license_data():
-        cmd = "steamcmd +login {} +licenses_print +quit".format(
-            steam_login).split()
+        cmd = "steamcmd +login {} +licenses_print +quit".format(login).split()
         proc = Popen(cmd, stdout=PIPE)
         content = [i.decode() for i in proc.stdout]
         index = [i for i, line in enumerate(content) if "License" in line][1:]
@@ -100,20 +85,17 @@ def prep_game_list():
                     g['location'] = l['location']
                     g['license'] = l['license']
                     break
-            if 'achiev' not in g.keys():
-                g['achiev'] = ""
 
-        values = [[show_icon(game), game['appid'], game['name'],
-                  game['paid'], time_played(game), price_per_hour(game),
-                  game['achiev'], discount_info(game), game['package'],
-                  game['date'], game['location'], game['license']]
+        values = [[show_icon(game), game['appid'], game['name'], game['paid'],
+                  game['time'], price_per_hour(game), game['achv'],
+                  discount_info(game), game['package'], game['date'],
+                  game['location'], game['license']]
                   for game in sorted(games, key=lambda k: k['appid'])]
 
         return [val for sublist in values for val in sublist]
 
-    return match_licenses(
-        merge_dict_lists(read_steam_data(), json.load(open('prices.json')),
-                         'appid'),
+    return match_licenses(merge_dict_lists(
+        read_steam_data(), load(open('prices.json')), 'appid'),
         read_license_data())
 
 
@@ -136,9 +118,6 @@ def upload_ss(game_list):
 
 
 if __name__ == "__main__":
-    private_data = json.load(open('config.json'))
-    api_key = private_data['api_key']
-    steamid = private_data['steamid']
-    steam_login = private_data['steam_login']
-
-    upload_ss(prep_game_list())
+    private_data = load(open('config.json'))
+    upload_ss(prep_game_list(private_data['api_key'], private_data['steamid'],
+                             private_data['steam_login']))
