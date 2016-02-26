@@ -5,6 +5,7 @@ from gspread import authorize
 from json import load
 from multiprocessing.dummy import Pool
 from oauth2client.service_account import ServiceAccountCredentials
+from os import path
 from re import findall
 from requests import get as rget
 from subprocess import Popen, PIPE
@@ -94,15 +95,18 @@ def prep_game_list(api_key, steamid, login):
 
         return [val for sublist in values for val in sublist]
 
+    prices_file = path.join(path.dirname(__file__), 'prices.json')
+
     return match_licenses(merge_dict_lists(
-        read_steam_data(), load(open('prices.json')), 'appid'),
+        read_steam_data(), load(open(prices_file)), 'appid'),
         read_license_data())
 
 
 def upload_ss(game_list):
-    scope = ['https://spreadsheets.google.com/feeds']
+    keyfile = path.join(path.dirname(__file__),
+                        private_data['json_keyfile_path'])
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        private_data['json_keyfile_path'], scope)
+        keyfile, ['https://spreadsheets.google.com/feeds'])
 
     gc = authorize(credentials)
 
@@ -118,6 +122,6 @@ def upload_ss(game_list):
 
 
 if __name__ == "__main__":
-    private_data = load(open('config.json'))
+    private_data = load(open(path.join(path.dirname(__file__), 'config.json')))
     upload_ss(prep_game_list(private_data['api_key'], private_data['steamid'],
                              private_data['steam_login']))
