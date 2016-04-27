@@ -1,5 +1,2 @@
 gspread
 oauth2client
-pycrypto
-requests
-
