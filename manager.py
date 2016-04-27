@@ -98,12 +98,12 @@ def add_remaining_info(games, licenses):
     return values
 
 
-def upload_ss(game_list, keyfile):
+def upload_ss(game_list, keyfile, ss_key):
     credentials = ServiceAccountCredentials.from_json_keyfile_name(
         keyfile, ['https://spreadsheets.google.com/feeds'])
     gc = authorize(credentials)
 
-    worksheet = gc.open_by_key(private_data['spreadsheet_key']).sheet1
+    worksheet = gc.open_by_key(ss_key).sheet1
     index, length = 2, int(len(game_list) / (ord('L') - ord('A') + 1))
     worksheet.resize(length + (index - 1))
 
@@ -127,4 +127,6 @@ if __name__ == "__main__":
     keyfile = path.join(path.dirname(__file__),
                         private_data['json_keyfile_path'])
 
-    upload_ss(add_remaining_info(steam_with_prices, licenses), keyfile)
+    ss_key = private_data['spreadsheet_key']
+
+    upload_ss(add_remaining_info(steam_with_prices, licenses), keyfile, ss_key)
