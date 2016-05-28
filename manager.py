@@ -126,11 +126,14 @@ def add_remaining_info(games, licenses):
                 g['license'] = l['license']
                 break
 
-        values += [
-            show_icon(g), g['appid'], g['name'], g['paid'], g['time'],
-            price_per_hour(g), g['achv'], discount_info(g), g['package'],
-            g['date'], g['location'], g['license']
-        ]
+        try:
+            values += [
+                show_icon(g), g['appid'], g['name'], g['paid'], g['time'],
+                price_per_hour(g), g['achv'], discount_info(g), g['package'],
+                g['date'], g['location'], g['license']
+            ]
+        except:
+            print(g['name'])
 
     return values
 
