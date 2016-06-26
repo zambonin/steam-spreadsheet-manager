@@ -2,7 +2,8 @@
 
 from datetime import datetime
 from gspread import authorize
-from json import load
+from itertools import takewhile
+from json import load, dump
 from multiprocessing.dummy import Pool
 from oauth2client.service_account import ServiceAccountCredentials
 from os import path
@@ -52,7 +53,33 @@ def read_steam_data(api_key, steamid, achiev=False):
     if achiev:
         achiev_data = read_achiev_data(i['appid'] for i in master)
         return merge_dict_lists(master, achiev_data, 'name')
+
     return master
+
+
+def price_input(game):
+    url = "http://store.steampowered.com/api/appdetails"
+    output = str(rget(url, params={"appids": str(game['appid'])}).json())
+
+    index = output.find("'is_free': ") + len("'is_free': ")
+    bool = output[index:].split(",")[0]
+
+    if bool != "False":
+        return 0.0, 0.0
+
+    index = output.find("'initial': ") + len("'initial': ")
+    orig = int("".join(takewhile(str.isdigit, output[index:]))) / 100
+
+    while True:
+        try:
+            paid = float(input("Price paid for {}: ".format(game['name'])))
+            if not isinstance(paid, float):
+                raise ValueError
+            break
+        except ValueError:
+            print("Invalid price.", end=' ')
+
+    return orig, paid
 
 
 def read_license_data(login):
@@ -91,14 +118,14 @@ def add_remaining_info(games, licenses):
                 g['license'] = l['license']
                 break
 
-        try:
-            values += [
-                show_icon(g), g['appid'], g['name'], g['paid'], g['time'],
-                price_per_hour(g), g['achv'], discount_info(g), g['package'],
-                g['date'], g['location'], g['license']
-            ]
-        except:
-            print(g['name'])
+        if 'paid' not in g.keys():
+            g['orig'], g['paid'] = price_input(g)
+
+        values += [
+            show_icon(g), g['appid'], g['name'], g['paid'], g['time'],
+            price_per_hour(g), g['achv'], discount_info(g), g['package'],
+            g['date'], g['location'], g['license']
+        ]
 
     return values
 
@@ -135,3 +162,13 @@ if __name__ == "__main__":
     ss_key = private_data['spreadsheet_key']
 
     upload_ss(add_remaining_info(steam_with_prices, licenses), keyfile, ss_key)
+
+    new_prices = [{
+        'appid': g['appid'],
+        'name': g['name'],
+        'orig': g['orig'],
+        'paid': g['paid'],
+    } for g in steam_with_prices]
+
+    dump(sorted(new_prices, key=lambda k: k['appid']),
+         open('prices2.json', 'w'), indent=4)
