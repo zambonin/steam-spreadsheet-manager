@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from gspread import authorize
-from itertools import takewhile
 from json import load, dump
 from multiprocessing.dummy import Pool
 from oauth2client.service_account import ServiceAccountCredentials
@@ -20,6 +19,30 @@ def merge_dict_lists(list1, list2, key):
         else:
             merged[item[key]] = item
     return [value for (_, value) in merged.items()]
+
+
+def price_input(game):
+    url = "http://store.steampowered.com/api/appdetails"
+    app = str(game['appid'])
+    output = rget(url, params={"appids": app}).json()[app]
+
+    if not output['success'] or output['data']['is_free']:
+        return 0.0, 0.0
+
+    orig = 0.0
+    if 'price_overview' in output['data'].keys():
+        orig = output['data']['price_overview']['initial'] / 100
+
+    while True:
+        try:
+            paid = float(input("Price paid for {}: ".format(game['name'])))
+            if not isinstance(paid, float):
+                raise ValueError
+            break
+        except ValueError:
+            print("Invalid price.", end=' ')
+
+    return orig, paid
 
 
 def read_steam_data(api_key, steamid, achiev=False):
@@ -46,40 +69,27 @@ def read_steam_data(api_key, steamid, achiev=False):
                   "include_played_free_games": 1, "include_appinfo": 1}
                   ).json()['response']['games']
 
+    price_path = path.join(path.dirname(__file__), 'prices.json')
+    prices_file = load(open(price_path)) if path.isfile(price_path) else []
+    master_with_prices = merge_dict_lists(master, prices_file, 'appid')
+
     for i in master:
         i['time'] = i.pop('playtime_forever') / 60
         i['achv'] = ""
+        if 'paid' not in i.keys():
+            i['orig'], i['paid'] = price_input(i)
+
+    new_prices = [{'appid': g['appid'], 'name': g['name'], 'orig': g['orig'],
+                   'paid': g['paid']} for g in master_with_prices]
+
+    dump(sorted(new_prices, key=lambda k: k['appid']),
+         open(price_path, 'w', encoding='utf8'), indent=4, ensure_ascii=False)
 
     if achiev:
         achiev_data = read_achiev_data(i['appid'] for i in master)
-        return merge_dict_lists(master, achiev_data, 'name')
+        return merge_dict_lists(master_with_prices, achiev_data, 'name')
 
-    return master
-
-
-def price_input(game):
-    url = "http://store.steampowered.com/api/appdetails"
-    output = str(rget(url, params={"appids": str(game['appid'])}).json())
-
-    index = output.find("'is_free': ") + len("'is_free': ")
-    bool = output[index:].split(",")[0]
-
-    if bool != "False":
-        return 0.0, 0.0
-
-    index = output.find("'initial': ") + len("'initial': ")
-    orig = int("".join(takewhile(str.isdigit, output[index:]))) / 100
-
-    while True:
-        try:
-            paid = float(input("Price paid for {}: ".format(game['name'])))
-            if not isinstance(paid, float):
-                raise ValueError
-            break
-        except ValueError:
-            print("Invalid price.", end=' ')
-
-    return orig, paid
+    return master_with_prices
 
 
 def read_license_data(login):
@@ -118,9 +128,6 @@ def add_remaining_info(games, licenses):
                 g['license'] = l['license']
                 break
 
-        if 'paid' not in g.keys():
-            g['orig'], g['paid'] = price_input(g)
-
         values += [
             show_icon(g), g['appid'], g['name'], g['paid'], g['time'],
             price_per_hour(g), g['achv'], discount_info(g), g['package'],
@@ -151,9 +158,7 @@ if __name__ == "__main__":
 
     steam_data = read_steam_data(private_data['api_key'],
                                  private_data['steamid'], True)
-    prices_file = load(open(path.join(path.dirname(__file__), 'prices.json')))
 
-    steam_with_prices = merge_dict_lists(steam_data, prices_file, 'appid')
     licenses = read_license_data(private_data['steam_login'])
 
     keyfile = path.join(path.dirname(__file__),
@@ -161,14 +166,4 @@ if __name__ == "__main__":
 
     ss_key = private_data['spreadsheet_key']
 
-    upload_ss(add_remaining_info(steam_with_prices, licenses), keyfile, ss_key)
-
-    new_prices = [{
-        'appid': g['appid'],
-        'name': g['name'],
-        'orig': g['orig'],
-        'paid': g['paid'],
-    } for g in steam_with_prices]
-
-    dump(sorted(new_prices, key=lambda k: k['appid']),
-         open('prices2.json', 'w'), indent=4)
+    upload_ss(add_remaining_info(steam_data, licenses), keyfile, ss_key)
