@@ -36,8 +36,6 @@ def price_input(game):
     while True:
         try:
             paid = float(input("Price paid for {}: ".format(game['name'])))
-            if not isinstance(paid, float):
-                raise ValueError
             break
         except ValueError:
             print("Invalid price.", end=' ')
