@@ -91,7 +91,7 @@ def read_steam_data(api_key, steamid, achiev=False):
 
 
 def read_license_data(login):
-    cmd = "steamcmd +login {} +licenses_print +quit".format(login).split()
+    cmd = "./steamcmd.sh +login {} +licenses_print +quit".format(login).split()
     content = [i.decode() for i in Popen(cmd, stdout=PIPE).stdout]
     index = [i for i, line in enumerate(content) if "License" in line][1:]
 
@@ -117,7 +117,8 @@ def add_remaining_info(games, licenses):
         return (1 - (game['paid'] / game['orig'])) if game['orig'] else 0
 
     values = []
-    for g in sorted(games, key=lambda k: k['appid']):
+    ng = filter(lambda x: 'appid' in x.keys(), games)
+    for g in sorted(ng, key=lambda k: k['appid']):
         for l in licenses:
             if str(g['appid']) in l['apps']:
                 g['package'] = l['package']

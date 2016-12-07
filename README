@@ -5,7 +5,7 @@ Dependencies can be installed with
 
     pip install -r requirements.txt
 
-You'll also need SteamCMD [1] installed.
+You'll also need SteamCMD [1] inside this folder.
 
 OAuth2 for login to your Google account must be setup as explained on [2].
 
@@ -24,6 +24,6 @@ from anywhere with
 
     python /path/to/manager.py
 
-[1] https://developer.valvesoftware.com/wiki/SteamCMD
+[1] https://developer.valvesoftware.com/wiki/SteamCMD#Manually
 [2] http://gspread.readthedocs.org/en/latest/oauth2.html
 [3] http://steamcommunity.com/dev/apikey

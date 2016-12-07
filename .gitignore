@@ -1,0 +1,8 @@
+bin/
+lib64
+linux32/
+package/
+public/
+pyvenv.cfg
+steam.sh
+steamcmd.sh
