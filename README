@@ -3,7 +3,7 @@ a Google spreadsheet.
 
 Dependencies can be installed with
 
-    pip install -r requirements.txt
+    # pip install -r requirements.txt
 
 You'll also need SteamCMD [1] inside this folder.
 

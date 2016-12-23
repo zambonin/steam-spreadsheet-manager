@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from datetime import datetime
 from gspread import authorize
@@ -77,8 +78,8 @@ def read_steam_data(api_key, steamid, achiev=False):
         if 'paid' not in i.keys():
             i['orig'], i['paid'] = price_input(i)
 
-    new_prices = [{'appid': g['appid'], 'name': g['name'], 'orig': g['orig'],
-                   'paid': g['paid']} for g in master_with_prices]
+    new_prices = [{i: g[i] for i in ['appid', 'name', 'orig', 'paid']}
+                  for g in master_with_prices]
 
     dump(sorted(new_prices, key=lambda k: k['appid']),
          open(price_path, 'w', encoding='utf8'), indent=4, ensure_ascii=False)
@@ -97,11 +98,11 @@ def read_license_data(login):
 
     return [{'package': int(findall(r'(\d+)', content[i])[0]),
              'date': datetime.strptime(findall(
-                 r'.* : (.+?) in .*', content[i+1])[0],
+                 r'.* : (.+?) in .*', content[i + 1])[0],
                  '%a %b %d %H:%M:%S %Y'),
-             'location': findall(r'"(.*?)"', content[i+1])[0],
-             'license': findall(r'.*\, (.*)', content[i+1])[0],
-             'apps': findall(r'(\d+)', content[i+2])[:-1]} for i in index]
+             'location': findall(r'"(.*?)"', content[i + 1])[0],
+             'license': findall(r'.*\, (.*)', content[i + 1])[0],
+             'apps': findall(r'(\d+)', content[i + 2])[:-1]} for i in index]
 
 
 def add_remaining_info(games, licenses):
