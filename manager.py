@@ -92,7 +92,8 @@ def read_steam_data(api_key, steamid, achiev=False):
 
 
 def read_license_data(login):
-    cmd = "./steamcmd.sh +login {} +licenses_print +quit".format(login).split()
+    cmdfile = path.join(path.dirname(__file__), 'steamcmd.sh')
+    cmd = "./{} +login {} +licenses_print +quit".format(cmdfile, login).split()
     content = [i.decode() for i in Popen(cmd, stdout=PIPE).stdout]
     index = [i for i, line in enumerate(content) if "License" in line][1:]
 
