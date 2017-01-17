@@ -34,43 +34,52 @@ def price_input(game):
     if 'price_overview' in output['data'].keys():
         orig = output['data']['price_overview']['initial'] / 100
 
-    while True:
+    valid = False
+    while not valid:
         try:
             paid = float(input("Price paid for {}: ".format(game['name'])))
-            break
+            if paid < 0:
+                raise ValueError
+            valid = True
         except ValueError:
             print("Invalid price.", end=' ')
 
     return orig, paid
 
 
-def read_steam_data(api_key, steamid, achiev=False):
-    def read_achiev_data(appids):
-        urls = [("http://api.steampowered.com/ISteamUserStats/"
-                 "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}"
-                 ).format(api_key, steamid, game) for game in appids]
+def read_achiev_data(api_key, steamid, appids):
+    urls = [("http://api.steampowered.com/ISteamUserStats/"
+             "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}"
+             ).format(api_key, steamid, game) for game in appids]
 
-        pool = Pool(len(urls))
-        results = pool.map(rget, urls)
-        pool.close()
-        pool.join()
+    pool = Pool(len(urls))
+    results = pool.map(rget, urls)
+    pool.close()
+    pool.join()
 
-        achiev_data = [i for i in [j.json()['playerstats'] for j in results]
-                       if i['success'] and 'achievements' in i.keys()]
+    ach = 'achievements'
+    achiev_data = filter(lambda x: x['success'] and ach in x.keys(),
+                         map(lambda x: x.json()['playerstats'], results))
 
-        return [{'name': i['gameName'],
-                 'achv': sum(a['achieved'] for a in
-                             i['achievements']) / len(i['achievements'])
-                 } for i in achiev_data]
+    return [{
+        'name': i['gameName'],
+        'achv': sum(a['achieved'] for a in i[ach]) / len(i[ach])
+    } for i in achiev_data]
 
+
+def read_steam_data(api_key, steamid):
     url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
-    master = rget(url, params={"key": api_key, "steamid": steamid,
-                  "include_played_free_games": 1, "include_appinfo": 1}
-                  ).json()['response']['games']
+    master = rget(url, params={
+        "key": api_key,
+        "steamid": steamid,
+        "include_played_free_games": 1,
+        "include_appinfo": 1
+    }).json()['response']['games']
 
+    app_list = [i['appid'] for i in master]
     price_path = path.join(path.dirname(__file__), 'prices.json')
     prices_file = load(open(price_path)) if path.isfile(price_path) else []
-    master_with_prices = merge_dict_lists(master, prices_file, 'appid')
+    merge_dict_lists(master, prices_file, 'appid')
 
     for i in master:
         i['time'] = i.pop('playtime_forever') / 60
@@ -78,17 +87,15 @@ def read_steam_data(api_key, steamid, achiev=False):
         if 'paid' not in i.keys():
             i['orig'], i['paid'] = price_input(i)
 
-    new_prices = [{i: g[i] for i in ['appid', 'name', 'orig', 'paid']}
-                  for g in master_with_prices]
+    f_keys = ['appid', 'name', 'orig', 'paid']
+    new_prices = filter(lambda x: x['appid'] in app_list,
+                        ({i: g[i] for i in f_keys} for g in master))
 
     dump(sorted(new_prices, key=lambda k: k['appid']),
          open(price_path, 'w', encoding='utf8'), indent=4, ensure_ascii=False)
 
-    if achiev:
-        achiev_data = read_achiev_data(i['appid'] for i in master)
-        return merge_dict_lists(master_with_prices, achiev_data, 'name')
-
-    return master_with_prices
+    achiev_data = read_achiev_data(api_key, steamid, app_list)
+    return merge_dict_lists(master, achiev_data, 'name')
 
 
 def read_license_data(login):
@@ -161,7 +168,7 @@ if __name__ == "__main__":
     private_data = load(open(path.join(path.dirname(__file__), 'config.json')))
 
     steam_data = read_steam_data(private_data['api_key'],
-                                 private_data['steamid'], True)
+                                 private_data['steamid'])
 
     licenses = read_license_data(private_data['steam_login'])
 
