@@ -1,29 +1,27 @@
 A Python script that outputs detailed information about a Steam library to
 a Google spreadsheet.
 
-Dependencies can be installed with
+Setup:
+  * install dependencies with `pip install -r requirements.txt`
+  * install SteamCMD as per fourth step of [1] and cache your credentials
+    by logging in once manually
+  * setup OAuth2 for Google as per [2]
+  * create `config.json` with the following fields:
 
-    # pip install -r requirements.txt
-
-You'll also need SteamCMD [1] inside this folder.
-
-OAuth2 for login to your Google account must be setup as explained on [2].
-
-The `config.json` file must have the following fields.
-
-    Field               What it is          Where to find it
-
-    spreadsheet_key     Google Sheets key   URL of spreadsheet
-    api_key             Steam API key       [3]
-    steamid             steamID64           https://steamdb.info/calculator/
-    steam_login         Your login nick     Only you should know it...
-    json_keyfile_path   OAuth2 file         Generated as per [2]
+  Field             | What it is        | Where to find it
+  ------------------+-------------------+-------------------------------------
+  api_key           | Steam API key     | [3]
+  json_keyfile_path | OAuth2 file       | [2]
+  spreadsheet_key   | Google Sheets key | URL of spreadsheet
+  steam_login       | Your login nick   | Top-right part of Steam store
+  steamid           | steamID64         | [4]
 
 All files must be on the same folder as the script, but it can be executed
 from anywhere with
 
-    python /path/to/manager.py
+    $ python /path/to/manager.py
 
 [1] https://developer.valvesoftware.com/wiki/SteamCMD#Manually
 [2] http://gspread.readthedocs.org/en/latest/oauth2.html
 [3] http://steamcommunity.com/dev/apikey
+[4] https://steamdb.info/calculator/
