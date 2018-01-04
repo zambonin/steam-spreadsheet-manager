@@ -1,27 +1,33 @@
-A Python script that outputs detailed information about a Steam library to
-a Google spreadsheet.
+A Python module that outputs detailed information about a Steam library to
+a Google Drive spreadsheet using `gspread`.
 
-Setup:
-  * install dependencies with `pip install -r requirements.txt`
-  * install SteamCMD as per fourth step of [1] and cache your credentials
-    by logging in once manually
-  * setup OAuth2 for Google as per [2]
-  * create `config.json` with the following fields:
+Before using it, one must first setup a configuration JSON file with six items,
+described below:
 
-  Field             | What it is        | Where to find it
-  ------------------+-------------------+-------------------------------------
-  api_key           | Steam API key     | [3]
-  json_keyfile_path | OAuth2 file       | [2]
-  spreadsheet_key   | Google Sheets key | URL of spreadsheet
-  steam_login       | Your login nick   | Top-right part of Steam store
-  steamid           | steamID64         | [4]
+  Field           | Description
+  ----------------|-----------------------------------------------------------
+  steam_api_key   | Key needed for using the Steam API, issued from [1].
+  google_api_key  | OAuth2 credentials are needed to communicate with Google
+                  | Drive as per [2]. This is the absolute path for the
+                  | generated service account key.
+  prices_file     | Absolute path to a JSON file created and updated by the
+                  | module describing how much one has paid for each game on
+                  | their account.
+  spreadsheet_key | Unique identifier for a Google Drive spreadsheet. It may
+                  | copied from its URL.
+  steam_login     | Username used for login on Steam services.
+  steamid         | The unique, 17-digit long identifier for a Steam account.
 
-All files must be on the same folder as the script, but it can be executed
-from anywhere with
+SteamCMD also needs to be installed, through your favourite package manager or
+manually as per [3], and your credentials cached by logging in once manually
+(also in the previous link).
 
-    $ python /path/to/manager.py
+Finally, install Python dependencies and run the module passing the JSON file
+as an argument:
 
-[1] https://developer.valvesoftware.com/wiki/SteamCMD#Manually
-[2] http://gspread.readthedocs.org/en/latest/oauth2.html
-[3] http://steamcommunity.com/dev/apikey
-[4] https://steamdb.info/calculator/
+    $ pip install -r requirements.txt
+    $ python -m manager <config.json>
+
+[1] https://steamcommunity.com/dev/apikey
+[2] https://gspread.readthedocs.org/en/latest/oauth2.html
+[3] https://developer.valvesoftware.com/wiki/SteamCMD
