@@ -1,8 +1,8 @@
 A Python module that outputs detailed information about a Steam library to
 a Google Drive spreadsheet using `gspread`.
 
-Before using it, one must first setup a configuration JSON file with six items,
-described below:
+Before using it, one must first setup a configuration JSON file with a few
+items, each described below:
 
   Field           | Description
   ----------------|-----------------------------------------------------------
@@ -17,6 +17,8 @@ described below:
                   | copied from its URL.
   steam_login     | Username used for login on Steam services.
   steamid         | The unique, 17-digit long identifier for a Steam account.
+  country_code    | A two-letter code that represents the currency with which
+                  | games were paid in. [4]
 
 SteamCMD also needs to be installed, through your favourite package manager or
 manually as per [3], and your credentials cached by logging in once manually
@@ -31,3 +33,4 @@ as an argument:
 [1] https://steamcommunity.com/dev/apikey
 [2] https://gspread.readthedocs.org/en/latest/oauth2.html
 [3] https://developer.valvesoftware.com/wiki/SteamCMD
+[4] https://partner.steamgames.com/doc/store/pricing/currencies
