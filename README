@@ -10,9 +10,9 @@ items, each described below:
   google_api_key  | OAuth2 credentials are needed to communicate with Google
                   | Drive as per [2]. This is the absolute path for the
                   | generated service account key.
-  prices_file     | Absolute path to a JSON file created and updated by the
-                  | module describing how much one has paid for each game on
-                  | their account.
+  prices_file      | Absolute path to a JSON file, created by the user and
+                  | updated by the module, describing how much one has paid
+                  | for each game on their account.
   spreadsheet_key | Unique identifier for a Google Drive spreadsheet. It may
                   | copied from its URL.
   steam_login     | Username used for login on Steam services.
