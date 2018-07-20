@@ -120,4 +120,4 @@ def upload(game_list, keyfile, ss_key):
 
     for cell, value in zip(cell_list, game_list):
         cell.value = value
-    worksheet.update_cells(cell_list)
+    worksheet.update_cells(cell_list, 'USER_ENTERED')

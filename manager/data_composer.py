@@ -208,7 +208,8 @@ def shape(api_key, steamid, login, file_path, c_code):
             show_icon(key, value['img_icon_url']), key, value['name'],
             value['paid'], value['time'], price_per_hour(value),
             value['achv'], discount_info(value), value['package'],
-            value['date'], value['location'], value['license']
+            value['date'].strftime('%d/%m/%Y %X'), value['location'],
+            value['license']
         ]
 
     return values
