@@ -1,5 +1,5 @@
 A Python module that outputs detailed information about a Steam library to
-a Google Drive spreadsheet using `gspread`.
+a JSON file.
 
 Before using it, one must first setup a configuration JSON file with a few
 items, each described below:
@@ -7,30 +7,26 @@ items, each described below:
   Field           | Description
   ----------------|-----------------------------------------------------------
   steam_api_key   | Key needed for using the Steam API, issued from [1].
-  google_api_key  | OAuth2 credentials are needed to communicate with Google
-                  | Drive as per [2]. This is the absolute path for the
-                  | generated service account key.
-  prices_file      | Absolute path to a JSON file, created by the user and
-                  | updated by the module, describing how much one has paid
-                  | for each game on their account.
-  spreadsheet_key | Unique identifier for a Google Drive spreadsheet. It may
-                  | copied from its URL.
   steam_login     | Username used for login on Steam services.
   steamid         | The unique, 17-digit long identifier for a Steam account.
-  country_code    | A two-letter code that represents the currency with which
-                  | games were paid in. [4]
+  itad_api_key    | Key needed for using the IsThereAnyDeal.com API, issued
+                  | from [4].
+
+Optionally, one also can add the `itad_region` and `itad_country` entries,
+according to [5].
 
 SteamCMD also needs to be installed, through your favourite package manager or
-manually as per [3], and your credentials cached by logging in once manually
+manually as per [2], and your credentials cached by logging in once manually
 (also in the previous link).
 
 Finally, install Python dependencies and run the module passing the JSON file
 as an argument:
 
     $ pip install -r requirements.txt
-    $ python -m manager <config.json>
+    $ python -m manager path/to/config.json
 
 [1] https://steamcommunity.com/dev/apikey
-[2] https://gspread.readthedocs.org/en/latest/oauth2.html
-[3] https://developer.valvesoftware.com/wiki/SteamCMD
-[4] https://partner.steamgames.com/doc/store/pricing/currencies
+[2] https://developer.valvesoftware.com/wiki/SteamCMD
+[3] https://partner.steamgames.com/doc/store/pricing/currencies
+[4] https://isthereanydeal.com/dev/app
+[5] https://api.isthereanydeal.com/v01/web/regions/

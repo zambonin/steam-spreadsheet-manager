@@ -4,20 +4,18 @@
 """__main__.py
 
 The main file for a Python module that outputs detailed information about a
-Steam library to a Google Drive spreadsheet.
+Steam library to a JSON file.
 """
 
 from json import load, decoder
+from pprint import pprint
 from sys import argv
 from .data_composer import shape
-from .data_conveyor import upload
 
 try:
     PRIVATE_DATA = load(open(argv[1]))
-    CELLS = shape(PRIVATE_DATA['steam_api_key'], PRIVATE_DATA['steamid'],
-                  PRIVATE_DATA['steam_login'], PRIVATE_DATA['prices_file'],
-                  PRIVATE_DATA['country_code'])
-    upload(CELLS, PRIVATE_DATA['google_api_key'],
-           PRIVATE_DATA['spreadsheet_key'])
+    pprint(shape(PRIVATE_DATA['steam_api_key'], PRIVATE_DATA['steamid'],
+                 PRIVATE_DATA['steam_login'], PRIVATE_DATA['itad_api_key'],
+                 PRIVATE_DATA['itad_region'], PRIVATE_DATA['itad_country']))
 except (IndexError, FileNotFoundError, decoder.JSONDecodeError):
     raise SystemExit("Valid configuration file needed!")

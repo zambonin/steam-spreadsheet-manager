@@ -4,20 +4,16 @@
 """data_conveyor.py
 
 Aggregates all functions related to communication with external entities, such
-as Google and Steam services.
+as Steam services.
 
-    * `gspread.authorize` logins to Google API using OAuth2 credentials.
-    * `oauth2client.service_account.ServiceAccountCredentials` handles the
-      creation of the object containing the credentials.
     * `requests.get` issues a simple HTTP request to a web page.
 """
 
 import asyncio
 from subprocess import Popen, PIPE
 
-from gspread import authorize
-from oauth2client.service_account import ServiceAccountCredentials
 from requests import get
+
 
 def get_games(api_key, steamid):
     """
@@ -35,28 +31,50 @@ def get_games(api_key, steamid):
     return get(url, params={
         "key": api_key, "steamid": steamid,
         "include_played_free_games": 1, "include_appinfo": 1,
-        }).json()['response']['games']
+    }).json()['response']['games']
 
 
-def get_original_price(appid, c_code):
+def get_prices(app_list, api_key, region, country):
     """
-    Gets the original price for a game through Steam store's open API.
+    Queries IsThereAnyDeal.com the current and historic prices for a list of
+    games.
 
     Args:
-        appid:  unique identifier for any product on Steam's store.
-        c_code: a string representing a two-letter country code.
+        app_list:   list of Steam appids.
+        api_key:    a IsThereAnyDeal.com API key.
+        region:     a region identifier according to [1].
+        country:    a two-letter country identifier according to [1].
+
+    [1] https://api.isthereanydeal.com/v01/web/regions/
 
     Returns:
-        A non-negative float representing the original price for a game on
-        Steam's store if it is still available.
+        A triple of raw dictionaries with site-specific identifiers, current
+        and lowest price data.
     """
-    url = "http://store.steampowered.com/api/appdetails"
-    output = get(url, params={"appids": appid, "cc": c_code}).json()
+    itad_url = "https://api.isthereanydeal.com/v01/game"
 
-    try:
-        return output[appid]['data']['price_overview']['initial'] / 100
-    except KeyError:
-        return 0.0
+    raw_plains = get(f'{itad_url}/plain/id', params={
+        "key": api_key, "shop": "steam",
+        "ids": ",".join(f'app/{g}' for g in app_list)
+    }).json()
+
+    plains = list(raw_plains['data'].values())
+    bundles = [plains[(i * 150):(i + 1) * 150]
+               for i in range(int(len(plains) / 150) + 1)]
+
+    prices, lowest = {'data': {}}, {'data': {}}
+    for bundle in bundles:
+        param_prices = {
+            "key": api_key, "shops": "steam", "region": region,
+            "country": country, "plains": ",".join(bundle)
+        }
+
+        prices['data'].update(get(f'{itad_url}/prices', params=param_prices).json()['data'])
+        # accurate description would consider time when license was acquired,
+        # but no need to hammer the api like that
+        lowest['data'].update(get(f'{itad_url}/lowest', params=param_prices).json()['data'])
+
+    return raw_plains, prices, lowest
 
 
 async def get_achievements(api_key, steamid, appids):
@@ -71,10 +89,11 @@ async def get_achievements(api_key, steamid, appids):
     Returns:
         A list of JSON pre-formatted responses for all game identifiers.
     """
+
     def get_game_achievs(_id):
         """Requests a raw JSON containing info about a game's achievements,
         identified by a unique identifier."""
-        return {_id : get(url.format(api_key, steamid, _id)).json()}
+        return {_id: get(url.format(api_key, steamid, _id)).json()}
 
     url = ("http://api.steampowered.com/ISteamUserStats/"
            "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}")
@@ -95,29 +114,3 @@ def read_license_data(login):
     """
     cmd = "steamcmd +login {} +licenses_print +quit".format(login).split()
     return [i.decode() for i in Popen(cmd, stdout=PIPE).stdout]
-
-
-def upload(game_list, keyfile, ss_key):
-    """
-    Performs authentication using OAuth2 and updates all cells at once,
-    resizing the spreadsheet if needed.
-
-    Args:
-        game_list:  a list of strings containing information to be written to
-                    spreadsheet cells.
-        keyfile:    a file path pointing to a JSON file with the private key
-                    used for authentication on Google's services.
-        ss_key:     a string representing the unique key for a spreadsheet.
-    """
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(
-        keyfile, ['https://spreadsheets.google.com/feeds'])
-    worksheet = authorize(credentials).open_by_key(ss_key).sheet1
-
-    index, length = 2, int(len(game_list) / (ord('L') - ord('A') + 1))
-    worksheet.resize(length + (index - 1))
-
-    cell_list = worksheet.range('A{}:L{}'.format(index, length + (index - 1)))
-
-    for cell, value in zip(cell_list, game_list):
-        cell.value = value
-    worksheet.update_cells(cell_list, 'USER_ENTERED')
