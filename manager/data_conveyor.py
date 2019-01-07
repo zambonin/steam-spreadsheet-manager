@@ -9,6 +9,7 @@ as Steam services.
     * `requests.get` issues a simple HTTP request to a web page.
 """
 
+from __future__ import absolute_import, division
 import asyncio
 from subprocess import Popen, PIPE
 
@@ -28,10 +29,15 @@ def get_games(api_key, steamid):
         an user's account.
     """
     url = "http://api.steampowered.com/IPlayerService/GetOwnedGames/v1/"
-    return get(url, params={
-        "key": api_key, "steamid": steamid,
-        "include_played_free_games": 1, "include_appinfo": 1,
-    }).json()['response']['games']
+    return get(
+        url,
+        params={
+            "key": api_key,
+            "steamid": steamid,
+            "include_played_free_games": 1,
+            "include_appinfo": 1,
+        },
+    ).json()["response"]["games"]
 
 
 def get_prices(app_list, api_key, region, country):
@@ -53,26 +59,39 @@ def get_prices(app_list, api_key, region, country):
     """
     itad_url = "https://api.isthereanydeal.com/v01/game"
 
-    raw_plains = get(f'{itad_url}/plain/id', params={
-        "key": api_key, "shop": "steam",
-        "ids": ",".join(f'app/{g}' for g in app_list)
-    }).json()
+    raw_plains = get(
+        f"{itad_url}/plain/id",
+        params={
+            "key": api_key,
+            "shop": "steam",
+            "ids": ",".join(f"app/{g}" for g in app_list),
+        },
+    ).json()
 
-    plains = list(raw_plains['data'].values())
-    bundles = [plains[(i * 150):(i + 1) * 150]
-               for i in range(int(len(plains) / 150) + 1)]
+    plains = list(raw_plains["data"].values())
+    bundles = [
+        plains[(i * 150) : (i + 1) * 150]
+        for i in range(int(len(plains) / 150) + 1)
+    ]
 
-    prices, lowest = {'data': {}}, {'data': {}}
+    prices, lowest = {"data": {}}, {"data": {}}
     for bundle in bundles:
         param_prices = {
-            "key": api_key, "shops": "steam", "region": region,
-            "country": country, "plains": ",".join(bundle)
+            "key": api_key,
+            "shops": "steam",
+            "region": region,
+            "country": country,
+            "plains": ",".join(bundle),
         }
 
-        prices['data'].update(get(f'{itad_url}/prices', params=param_prices).json()['data'])
+        prices["data"].update(
+            get(f"{itad_url}/prices", params=param_prices).json()["data"]
+        )
         # accurate description would consider time when license was acquired,
         # but no need to hammer the api like that
-        lowest['data'].update(get(f'{itad_url}/lowest', params=param_prices).json()['data'])
+        lowest["data"].update(
+            get(f"{itad_url}/lowest", params=param_prices).json()["data"]
+        )
 
     return raw_plains, prices, lowest
 
@@ -95,11 +114,14 @@ async def get_achievements(api_key, steamid, appids):
         identified by a unique identifier."""
         return {_id: get(url.format(api_key, steamid, _id)).json()}
 
-    url = ("http://api.steampowered.com/ISteamUserStats/"
-           "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}")
+    url = (
+        "http://api.steampowered.com/ISteamUserStats/"
+        "GetPlayerAchievements/v0001/?key={}&steamid={}&appid={}"
+    )
     loop = asyncio.get_event_loop()
-    return await asyncio.gather(*[
-        loop.run_in_executor(None, get_game_achievs, _id) for _id in appids])
+    return await asyncio.gather(
+        *[loop.run_in_executor(None, get_game_achievs, _id) for _id in appids]
+    )
 
 
 def read_license_data(login):
