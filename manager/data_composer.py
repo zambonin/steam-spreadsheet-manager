@@ -92,7 +92,9 @@ def parse_achievements_data(api_key, steamid):
     games = parse_games_data(api_key, steamid)
     achiev_dict = {appid: {"achv": ""} for appid in games.keys()}
     apps = [
-        k for k, v in games.items() if "has_community_visible_stats" in v.keys()
+        k
+        for k, v in games.items()
+        if "has_community_visible_stats" in v.keys()
     ]
 
     loop = asyncio.get_event_loop()

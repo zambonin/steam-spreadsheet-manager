@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
+# pylint: disable=E203
 
 """data_conveyor.py
 
@@ -69,9 +70,12 @@ def get_prices(app_list, api_key, region, country):
     ).json()
 
     plains = list(raw_plains["data"].values())
+
+    # query in bundles to prevent api over-usage
+    bundle_len = 150
     bundles = [
-        plains[(i * 150) : (i + 1) * 150]
-        for i in range(int(len(plains) / 150) + 1)
+        plains[(i * bundle_len) : (i + 1) * bundle_len]
+        for i in range(int(len(plains) / bundle_len) + 1)
     ]
 
     prices, lowest = {"data": {}}, {"data": {}}
