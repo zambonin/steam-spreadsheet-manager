@@ -11,6 +11,8 @@ items, each described below:
   steamid         | The unique, 17-digit long identifier for a Steam account.
   itad_api_key    | Key needed for using the IsThereAnyDeal.com API, issued
                   | from [4].
+  output_file     | Path where the resulting JSON file will be saved to.
+                  | (Will overwrite existing data!)
 
 Optionally, one also can add the `itad_region` and `itad_country` entries,
 according to [5].

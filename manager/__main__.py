@@ -8,14 +8,13 @@ Steam library to a JSON file.
 """
 
 from __future__ import absolute_import
-from json import load, decoder
-from pprint import pprint
+from json import load, decoder, dump
 from sys import argv
 from .data_composer import shape
 
 try:
     PRIVATE_DATA = load(open(argv[1]))
-    pprint(
+    dump(
         shape(
             PRIVATE_DATA["steam_api_key"],
             PRIVATE_DATA["steamid"],
@@ -23,7 +22,9 @@ try:
             PRIVATE_DATA["itad_api_key"],
             PRIVATE_DATA["itad_region"],
             PRIVATE_DATA["itad_country"],
-        )
+        ),
+        open(PRIVATE_DATA["output_file"], "w"),
+        indent=2,
     )
 except (IndexError, FileNotFoundError, decoder.JSONDecodeError):
     raise SystemExit("Valid configuration file needed!")
